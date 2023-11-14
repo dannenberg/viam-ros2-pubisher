@@ -81,7 +81,11 @@ class RosTopicPublisher(Generic, Reconfigurable):
             timeout: Optional[float] = None,
             **kwargs
     ):
-        raise NotImplementedError()
+        for key in command:
+            if key == "send":
+                with self.lock:
+                    self.msg = command[key]
+        return
 
 
 Registry.register_resource_creator(
