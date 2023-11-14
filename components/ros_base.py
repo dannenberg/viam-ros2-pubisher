@@ -5,7 +5,7 @@ from utils import RclpyNodeManager
 from viam.logging import getLogger
 from typing import Any, ClassVar, Dict, Mapping, Optional, Sequence, Tuple
 from typing_extensions import Self
-from viam.components.base import Base
+from viam.components.generic import Generic
 from viam.module.types import Reconfigurable
 from viam.proto.app.robot import ComponentConfig
 from viam.proto.common import ResourceName
@@ -22,24 +22,23 @@ from .viam_ros_node import ViamRosNode
 logger = getLogger(__name__)
 
 
-class RosBase(Base, Reconfigurable):
-    MODEL: ClassVar[Model] = Model(ModelFamily('viamlabs', 'ros2'), 'base')
-    is_base_moving: bool
+class RosTopicPublisher(Generic, Reconfigurable):
+    MODEL: ClassVar[Model] = Model(ModelFamily('viamlabs', 'ros2'), 'topic-publisher')
     lock: Lock
     logger: logging.Logger
+    msg: str
     publisher: Publisher
     publish_rate: float
     rate: Rate
     ros_node: ViamRosNode
     ros_topic: str
-    twist_msg: Twist
 
     @classmethod
     def new(cls, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]) -> Self:
-        base = cls(config.name)
-        base.ros_node = None
-        base.reconfigure(config, dependencies)
-        return base
+        publisher = cls(config.name)
+        publisher.ros_node = None
+        publisher.reconfigure(config, dependencies)
+        return publisher
 
     @classmethod
     def validate_config(cls, config: ComponentConfig) -> Sequence[str]:
@@ -55,13 +54,13 @@ class RosBase(Base, Reconfigurable):
         return []
 
     def ros_publisher_cb(self):
-        self.publisher.publish(self.twist_msg)
+        self.publisher.publish(self.msg)
 
 
     def reconfigure(self, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]):
         self.ros_topic = config.attributes.fields['ros_topic'].string_value
         self.publish_rate = float(config.attributes.fields['publish_rate'].string_value)
-        self.twist_msg = Twist()
+        self.msg = ""
 
         if self.ros_node is not None:
             if self.publisher is not None:
@@ -71,63 +70,9 @@ class RosBase(Base, Reconfigurable):
         else:
             self.ros_node = ViamRosNode.get_viam_ros_node()
 
-        self.publisher = self.ros_node.create_publisher(Twist, self.ros_topic, 10)
+        self.publisher = self.ros_node.create_publisher(str, self.ros_topic, 10)
         self.rate = self.ros_node.create_timer(self.publish_rate, self.ros_publisher_cb)
-        self.is_base_moving = False
         self.lock = Lock()
-
-    async def move_straight(self, distance: int, velocity: float, *, extra: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None, **kwargs):
-        raise NotImplementedError()
-
-    async def spin(self, angle: float, velocity: float, *, extra: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None, **kwargs):
-        raise NotImplementedError()
-
-    async def set_power(
-            self,
-            linear: viam.components.base.Vector3,
-            angular: viam.components.base.Vector3,
-            *,
-            extra: Optional[Dict[str, Any]] = None,
-            timeout: Optional[float] = None, **kwargs
-    ) -> None:
-        with self.lock:
-            self.twist_msg.linear.x = linear.y
-            self.twist_msg.angular.z = angular.z
-            self.is_base_moving = True
-        logger.debug(f'set_power: {self.twist_msg}')
-
-    async def set_velocity(
-            self,
-            linear: viam.components.base.Vector3,
-            angular: viam.components.base.Vector3,
-            *,
-            extra: Optional[Dict[str, Any]] = None,
-            timeout: Optional[float] = None,
-            **kwargs
-    ) -> None:
-        with self.lock:
-            self.twist_msg.linear.x = linear.y
-            self.twist_msg.angular.z = angular.z
-            self.is_base_moving = True
-        logger.debug(f'set_velocity: {self.twist_msg}')
-
-    async def stop(
-            self,
-            extra: Optional[Dict[str, Any]] = None,
-            timeout: Optional[float] = None,
-            **kwargs
-    ) -> None:
-        with self.lock:
-            self.twist_msg.linear.x = 0.0
-            self.twist_msg.angular.z = 0.0
-            self.is_base_moving = False
-        logger.debug(f'stop: done')
-
-    async def is_moving(self):
-        return self.is_base_moving
-
-    async def get_properties(self, *, timeout: Optional[float] = None, **kwargs):
-        raise NotImplementedError()
 
     async def do_command(
             self,
@@ -141,6 +86,6 @@ class RosBase(Base, Reconfigurable):
 
 Registry.register_resource_creator(
     Base.SUBTYPE,
-    RosBase.MODEL,
-    ResourceCreatorRegistration(RosBase.new, RosBase.validate_config)
+    RosTopicPublisher.MODEL,
+    ResourceCreatorRegistration(RosTopicPublisher.new, RosTopicPublisher.validate_config)
 )
