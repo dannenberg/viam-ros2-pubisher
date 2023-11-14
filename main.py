@@ -6,13 +6,10 @@ import os
 import signal
 import sys
 
-from viam.components.base import Base
-from viam.components.camera import Camera
-from viam.components.movement_sensor import MovementSensor
-from viam.components.sensor import Sensor
+from viam.components.generic import Generic
 from viam.logging import getLogger
 from viam.module.module import Module
-from components import RosBase, RosImu, RosLidar, RosSensor, ViamRosNode, RosCamera
+from components import RosTopicPublisher
 from utils import RclpyNodeManager
 
 logger = getLogger(__name__)
@@ -38,11 +35,7 @@ async def main(addr: str) -> None:
         rclpy_mgr.spin_and_add_node(viam_node)
 
         m = Module(addr)
-        m.add_model_from_registry(Base.SUBTYPE, RosBase.MODEL)
-        m.add_model_from_registry(MovementSensor.SUBTYPE, RosImu.MODEL)
-        m.add_model_from_registry(Camera.SUBTYPE, RosLidar.MODEL)
-        m.add_model_from_registry(Sensor.SUBTYPE, RosSensor.MODEL)
-        m.add_model_from_registry(Camera.SUBTYPE, RosCamera.MODEL)
+        m.add_model_from_registry(Generic.SUBTYPE, RosTopicPublisher.MODEL)
         await m.start()
     finally:
         rclpy_mgr.shutdown()
